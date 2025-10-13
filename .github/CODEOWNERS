@@ -1,8 +1,6 @@
 # Глобальный владелец (на курс)
-*                 @instructors
+*                 @aNd1CE
 
 # Пример владельцев по компонентам (замените на свои команды/логины)
-app/auth/*        @instructors
-app/api/*         @instructors
-app/main.py       @instructors
-tests/*           @instructors
+app/auth/*        @aNd1CE
+app/api/*         @aNd1CE
