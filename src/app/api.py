@@ -31,7 +31,9 @@ from src.services.security_service import security_service
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-app = FastAPI(title="MVP API", description="Minimum Viable Product API", version="1.0.0")
+app = FastAPI(
+    title="MVP API", description="Minimum Viable Product API", version="1.0.0"
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -107,7 +109,9 @@ def get_current_user(
 def get_admin_user(user: User = Depends(get_current_user)) -> User:
     """Get current admin user."""
     if user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN, detail="Admin access required"
+        )
     return user
 
 
@@ -138,12 +142,16 @@ async def general_exception_handler(request, exc: Exception):
     logger.error(f"Unhandled exception: {exc}", exc_info=True)
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(code="INTERNAL_ERROR", message="Internal server error").model_dump(),
+        content=ErrorResponse(
+            code="INTERNAL_ERROR", message="Internal server error"
+        ).model_dump(),
     )
 
 
 # Authentication endpoints
-@app.post("/api/v1/auth/register", response_model=Token, status_code=status.HTTP_201_CREATED)
+@app.post(
+    "/api/v1/auth/register", response_model=Token, status_code=status.HTTP_201_CREATED
+)
 async def register(user_data: UserCreate):
     """Register a new user."""
     try:
@@ -168,23 +176,31 @@ async def login(login_data: UserLogin):
 @app.post("/api/v1/auth/logout", status_code=status.HTTP_204_NO_CONTENT)
 async def logout(current_user: User = Depends(get_current_user)):
     """Logout user."""
-    auth_service.logout_user(current_user.id)  # Assuming logout invalidates token by user_id
+    auth_service.logout_user(
+        current_user.id
+    )  # Assuming logout invalidates token by user_id
     # For now, we'll just log the logout
     logger.info(f"User logged out: {current_user.username}")
 
 
 # Items endpoints
 @app.post("/api/v1/items", response_model=Item, status_code=status.HTTP_201_CREATED)
-async def create_item(item_data: ItemCreate, current_user: User = Depends(get_current_user)):
+async def create_item(
+    item_data: ItemCreate, current_user: User = Depends(get_current_user)
+):
     """Create a new item."""
     # Validate input using security service
     if not security_service.validate_item_input(item_data.name):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item name")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item name"
+        )
 
     item = item_service.create_item(item_data, current_user.id)
 
     # Log security event
-    security_service.log_item_event("created", item.id, current_user.id, name=item_data.name)
+    security_service.log_item_event(
+        "created", item.id, current_user.id, name=item_data.name
+    )
 
     logger.info(f"Item created: {item.id} by user {current_user.username}")
     return item
@@ -195,11 +211,15 @@ async def get_item(item_id: int, current_user: User = Depends(get_current_user))
     """Get item by ID."""
     # Validate item ID
     if not security_service.input_validator.validate_item_id(item_id):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item ID")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid item ID"
+        )
 
     item = item_service.get_item(item_id, current_user)
     if not item:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Item not found")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Item not found"
+        )
 
     # Log access
     security_service.log_item_event("accessed", item_id, current_user.id)

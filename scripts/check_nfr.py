@@ -190,7 +190,9 @@ class NFRChecker:
                     status_emoji = "❌"
                 else:
                     status_emoji = "⚠️"
-                print(f"{status_emoji} {result['nfr_id']}: {result['name']} - {result['status']}")
+                print(
+                    f"{status_emoji} {result['nfr_id']}: {result['name']} - {result['status']}"
+                )
             except Exception as e:
                 print(f"❌ Ошибка при выполнении проверки: {e}")
 

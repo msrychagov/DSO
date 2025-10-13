@@ -44,7 +44,9 @@ class TestAuthentication:
             "password": "password123",
         }
         client.post("/api/v1/auth/register", json=user_data)  # First registration
-        response = client.post("/api/v1/auth/register", json=user_data)  # Second registration
+        response = client.post(
+            "/api/v1/auth/register", json=user_data
+        )  # Second registration
         assert response.status_code == 400
         assert response.json()["message"] == "Username already exists"
 
@@ -102,7 +104,9 @@ class TestItems:
     def test_get_item_success(self):
         """Test successful item retrieval."""
         item_data = {"name": "Get Item", "description": "Description for get"}
-        create_response = client.post("/api/v1/items", json=item_data, headers=self.headers)
+        create_response = client.post(
+            "/api/v1/items", json=item_data, headers=self.headers
+        )
         item_id = create_response.json()["id"]
 
         response = client.get(f"/api/v1/items/{item_id}", headers=self.headers)
@@ -132,11 +136,15 @@ class TestItems:
     def test_update_item_success(self):
         """Test successful item update."""
         item_data = {"name": "Original Name"}
-        create_response = client.post("/api/v1/items", json=item_data, headers=self.headers)
+        create_response = client.post(
+            "/api/v1/items", json=item_data, headers=self.headers
+        )
         item_id = create_response.json()["id"]
 
         update_data = {"name": "Updated Name", "description": "New Description"}
-        response = client.patch(f"/api/v1/items/{item_id}", json=update_data, headers=self.headers)
+        response = client.patch(
+            f"/api/v1/items/{item_id}", json=update_data, headers=self.headers
+        )
         assert response.status_code == 200
         assert response.json()["name"] == "Updated Name"
         assert response.json()["description"] == "New Description"
@@ -144,7 +152,9 @@ class TestItems:
     def test_delete_item_success(self):
         """Test successful item deletion."""
         item_data = {"name": "Item to Delete"}
-        create_response = client.post("/api/v1/items", json=item_data, headers=self.headers)
+        create_response = client.post(
+            "/api/v1/items", json=item_data, headers=self.headers
+        )
         item_id = create_response.json()["id"]
 
         response = client.delete(f"/api/v1/items/{item_id}", headers=self.headers)
@@ -168,7 +178,9 @@ class TestItems:
 
         # Create item with first user
         item_data = {"name": "User 1 Item", "description": "User 1 Description"}
-        create_response = client.post("/api/v1/items", json=item_data, headers=self.headers)
+        create_response = client.post(
+            "/api/v1/items", json=item_data, headers=self.headers
+        )
         item_id = create_response.json()["id"]
 
         # Try to access with second user
