@@ -244,9 +244,7 @@ class TestCORSConfiguration:
         assert response.status_code == 200
 
         # Test with disallowed origin (should still work but CORS headers should be restrictive)
-        response = client.get(
-            "/items", headers={"Origin": "https://malicious-site.com"}
-        )
+        response = client.get("/items", headers={"Origin": "https://malicious-site.com"})
         # The request itself should work, but CORS headers should prevent cross-origin access
         assert response.status_code == 200
 

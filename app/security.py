@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 class RateLimiter:
     """Rate limiting control for R1 (Brute force attacks) and R4 (DDoS)"""
 
-    def __init__(
-        self, max_requests: int = 5, time_window: int = 60, enabled: bool = True
-    ):
+    def __init__(self, max_requests: int = 5, time_window: int = 60, enabled: bool = True):
         self.max_requests = max_requests
         self.time_window = time_window
         self.enabled = enabled
