@@ -7,14 +7,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from src.domain.models import (
-    Item,
-    ItemCreate,
-    ItemUpdate,
-    PaginationParams,
-    User,
-    UserCreate,
-)
+from src.domain.models import Item, ItemCreate, ItemUpdate, PaginationParams, User, UserCreate
 
 
 class Database:
