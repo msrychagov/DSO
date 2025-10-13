@@ -1,15 +1,26 @@
-# SecDev Course Template
+# SecDev Course Project
 
-Стартовый шаблон для студенческого репозитория (HSE SecDev 2025).
+Курсовой проект по безопасной разработке (HSE SecDev 2025).
 
 ## Быстрый старт
+
+### Установка и запуск
 ```bash
+# Создание виртуального окружения
 python -m venv .venv
 source .venv/bin/activate  # Windows: .venv\Scripts\Activate.ps1
+
+# Установка зависимостей
 pip install -r requirements.txt -r requirements-dev.txt
+
+# Настройка pre-commit хуков
 pre-commit install
+
+# Запуск приложения
 uvicorn app.main:app --reload
 ```
+
+Приложение будет доступно по адресу: http://localhost:8000
 
 ## Ритуал перед PR
 ```bash
