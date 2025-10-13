@@ -2,6 +2,7 @@
 """
 Скрипт для проверки выполнения Security NFR
 """
+
 import json
 import subprocess
 import sys
