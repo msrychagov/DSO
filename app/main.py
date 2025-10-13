@@ -5,13 +5,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
 
-# Настройка логирования
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
-
 from app.security import AuditLogger, InputValidator, security_middleware
 
-# Configure logging
+# Настройка логирования
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -152,6 +148,7 @@ def create_item(name: str, request: Request):
     item_id = len(_DB["items"]) + 1
     new_item = {"id": item_id, "name": item.name}
     _DB["items"].append(new_item)
+
 
 @app.get("/items/{item_id}")
 def get_item(item_id: int, request: Request):
