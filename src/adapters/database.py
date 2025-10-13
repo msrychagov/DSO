@@ -7,14 +7,7 @@ import hashlib
 from datetime import datetime
 from typing import Dict, List, Optional
 
-from src.domain.models import (
-    Item,
-    ItemCreate,
-    ItemUpdate,
-    PaginationParams,
-    User,
-    UserCreate,
-)
+from src.domain.models import Item, ItemCreate, ItemUpdate, PaginationParams, User, UserCreate
 
 
 class Database:
@@ -23,7 +16,9 @@ class Database:
     def __init__(self):
         self.users: Dict[int, User] = {}
         self.items: Dict[int, Item] = {}
-        self.user_passwords: Dict[int, str] = {}  # In production, use proper password hashing
+        self.user_passwords: Dict[int, str] = (
+            {}
+        )  # In production, use proper password hashing
         self.next_user_id = 1
         self.next_item_id = 1
 
@@ -95,7 +90,9 @@ class Database:
     ) -> tuple[List[Item], int]:
         """Get items by owner with pagination."""
         owner_items = [
-            item for item in self.items.values() if item.owner_id == owner_id and item.is_active
+            item
+            for item in self.items.values()
+            if item.owner_id == owner_id and item.is_active
         ]
         total = len(owner_items)
         start = pagination.offset
@@ -110,7 +107,9 @@ class Database:
         end = pagination.offset + pagination.limit
         return active_items[start:end], total
 
-    def update_item(self, item_id: int, update_data: ItemUpdate, owner_id: int) -> Optional[Item]:
+    def update_item(
+        self, item_id: int, update_data: ItemUpdate, owner_id: int
+    ) -> Optional[Item]:
         """Update an item."""
         item = self.items.get(item_id)
         if not item or item.owner_id != owner_id:
