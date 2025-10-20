@@ -262,9 +262,7 @@ def _load_int_env(name: str, default: int) -> int:
             raise ValueError
         return value
     except ValueError:
-        logger.warning(
-            "Invalid value '%s' for %s. Falling back to %s.", raw, name, default
-        )
+        logger.warning("Invalid value '%s' for %s. Falling back to %s.", raw, name, default)
         return default
 
 

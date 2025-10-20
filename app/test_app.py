@@ -45,11 +45,7 @@ async def security_middleware_handler(request: Request, call_next):
         headers = test_security_middleware.get_security_headers()
         if e.headers:
             headers.update(e.headers)
-        title = (
-            "Rate limit exceeded"
-            if e.status_code == 429
-            else "Security policy violation"
-        )
+        title = "Rate limit exceeded" if e.status_code == 429 else "Security policy violation"
         detail = e.detail if isinstance(e.detail, str) else title
         extras = {
             "code": "rate_limit_exceeded" if e.status_code == 429 else "security_error",
@@ -118,9 +114,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 
 @app.exception_handler(StarletteHTTPException)
-async def starlette_http_exception_handler(
-    request: Request, exc: StarletteHTTPException
-):
+async def starlette_http_exception_handler(request: Request, exc: StarletteHTTPException):
     return _http_problem_response(
         request,
         status=exc.status_code,

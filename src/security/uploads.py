@@ -53,9 +53,7 @@ def _resolve_storage_dir(base_dir: str | os.PathLike[str]) -> Path:
 
     # Reject storage rooted in symlinks to avoid swapping directories at runtime.
     if base_path.is_symlink():
-        raise UploadError(
-            "symlink_parent", "Upload directory must not be a symlink", status=500
-        )
+        raise UploadError("symlink_parent", "Upload directory must not be a symlink", status=500)
     return base_path
 
 
@@ -67,9 +65,7 @@ def secure_store(base_dir: str | os.PathLike[str], data: bytes) -> StoredFile:
     and ensures the resulting path stays within the storage root.
     """
     if len(data) > MAX_BYTES:
-        raise UploadError(
-            "payload_too_large", "Maximum upload size is 5 MB", status=413
-        )
+        raise UploadError("payload_too_large", "Maximum upload size is 5 MB", status=413)
 
     media_type = sniff_media_type(data)
     if media_type not in ALLOWED_TYPES:
@@ -85,12 +81,8 @@ def secure_store(base_dir: str | os.PathLike[str], data: bytes) -> StoredFile:
         raise UploadError("path_traversal", "Invalid storage path detected", status=400)
 
     # Protect against symlinks anywhere in the ancestor chain.
-    if any(
-        parent.is_symlink() for parent in file_path.parents if parent != storage_root
-    ):
-        raise UploadError(
-            "symlink_parent", "Upload directory contains symlinks", status=400
-        )
+    if any(parent.is_symlink() for parent in file_path.parents if parent != storage_root):
+        raise UploadError("symlink_parent", "Upload directory contains symlinks", status=400)
 
     file_path.write_bytes(data)
     return StoredFile(resource_id=file_name, media_type=media_type, path=file_path)

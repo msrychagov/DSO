@@ -53,9 +53,7 @@ class TestRateLimiting:
 
         # Wait for time window to reset
         time.sleep(1.1)
-        assert (
-            rate_limiter.check("127.0.0.1").allowed is True
-        )  # Should be allowed again
+        assert rate_limiter.check("127.0.0.1").allowed is True  # Should be allowed again
 
 
 class TestInputValidation:
@@ -252,9 +250,7 @@ class TestCORSConfiguration:
         assert response.status_code == 200
 
         # Test with disallowed origin (should still work but CORS headers should be restrictive)
-        response = client.get(
-            "/items", headers={"Origin": "https://malicious-site.com"}
-        )
+        response = client.get("/items", headers={"Origin": "https://malicious-site.com"})
         # The request itself should work, but CORS headers should prevent cross-origin access
         assert response.status_code == 200
 
