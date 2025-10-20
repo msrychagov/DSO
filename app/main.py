@@ -1,11 +1,16 @@
 import logging
+import os
+from pathlib import Path
+from typing import Any, Mapping
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field, field_validator
+from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.security import AuditLogger, InputValidator, security_middleware
+from src.security import problem_response
+from src.security.uploads import MAX_BYTES, UploadError, secure_store
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO)
@@ -30,10 +35,25 @@ async def security_middleware_handler(request: Request, call_next):
         # Process request through security controls
         await security_middleware.process_request(request)
     except HTTPException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": {"code": "SECURITY_ERROR", "message": e.detail}},
-            headers=security_middleware.get_security_headers(),
+        security_headers = security_middleware.get_security_headers()
+        if e.headers:
+            security_headers.update(e.headers)
+        title = (
+            "Rate limit exceeded"
+            if e.status_code == 429
+            else "Security policy violation"
+        )
+        detail = e.detail if isinstance(e.detail, str) else title
+        extras = {
+            "code": "rate_limit_exceeded" if e.status_code == 429 else "security_error",
+        }
+        return problem_response(
+            status=e.status_code,
+            title=title,
+            detail=detail,
+            headers=security_headers,
+            extras=extras,
+            instance=str(request.url.path),
         )
 
     # Process request
@@ -69,29 +89,59 @@ class ErrorResponse(BaseModel):
 
 
 class ApiError(Exception):
-    def __init__(self, code: str, message: str, status: int = 400):
+    def __init__(
+        self,
+        *,
+        code: str,
+        title: str,
+        detail: str,
+        status: int = 400,
+        type_: str = "about:blank",
+        extras: dict[str, Any] | None = None,
+    ):
         self.code = code
-        self.message = message
+        self.title = title
+        self.detail = detail
         self.status = status
+        self.type_ = type_
+        self.extras = extras or {}
 
 
 @app.exception_handler(ApiError)
 async def api_error_handler(request: Request, exc: ApiError):
-    logger.warning(f"API Error: {exc.code} - {exc.message} for {request.url}")
-    return JSONResponse(
-        status_code=exc.status,
-        content={"error": {"code": exc.code, "message": exc.message}},
+    logger.warning(f"API Error: {exc.code} - {exc.detail} for {request.url}")
+    extras = {"code": exc.code}
+    extras.update(exc.extras)
+    return problem_response(
+        status=exc.status,
+        title=exc.title,
+        detail=exc.detail,
+        type_=exc.type_,
+        extras=extras,
+        instance=str(request.url.path),
     )
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     # Normalize FastAPI HTTPException into our error envelope
-    detail = exc.detail if isinstance(exc.detail, str) else "http_error"
-    logger.warning(f"HTTP Error: {exc.status_code} - {detail} for {request.url}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": {"code": "http_error", "message": detail}},
+    return _http_problem_response(
+        request,
+        status=exc.status_code,
+        detail=exc.detail,
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def starlette_http_exception_handler(
+    request: Request, exc: StarletteHTTPException
+):
+    return _http_problem_response(
+        request,
+        status=exc.status_code,
+        detail=exc.detail,
+        headers=exc.headers,
     )
 
 
@@ -101,11 +151,38 @@ async def general_exception_handler(request: Request, exc: Exception):
         f"Unhandled exception: {type(exc).__name__}: {str(exc)} for {request.url}",
         exc_info=True,
     )
-    return JSONResponse(
-        status_code=500,
-        content={
-            "error": {"code": "internal_error", "message": "Internal server error"}
-        },
+    return problem_response(
+        status=500,
+        title="Internal server error",
+        detail="Internal server error",
+        extras={"code": "internal_error"},
+        instance=str(request.url.path),
+    )
+
+
+def _http_problem_response(
+    request: Request,
+    *,
+    status: int,
+    detail: Any,
+    headers: Mapping[str, str] | None,
+):
+    """Normalize HTTP exceptions to RFC 7807."""
+    normalized_detail = detail if isinstance(detail, str) else "HTTP error"
+    title = "HTTP error"
+    code = "http_error"
+    if status == 404:
+        title = "Resource not found"
+        normalized_detail = "Requested resource was not found"
+        code = "not_found"
+    logger.warning(f"HTTP Error: {status} - {normalized_detail} for {request.url}")
+    return problem_response(
+        status=status,
+        title=title,
+        detail=normalized_detail,
+        headers=headers,
+        extras={"code": code},
+        instance=str(request.url.path),
     )
 
 
@@ -126,7 +203,8 @@ def create_item(name: str, request: Request):
         logger.warning(f"Invalid item name attempted: {name}")
         raise ApiError(
             code="validation_error",
-            message="Invalid item name. Contains forbidden characters or exceeds length limit.",
+            title="Invalid item name",
+            detail="Invalid item name. Contains forbidden characters or exceeds length limit.",
             status=422,
         )
 
@@ -145,10 +223,6 @@ def create_item(name: str, request: Request):
     logger.info(f"Item created successfully: {item}")
     return item
 
-    item_id = len(_DB["items"]) + 1
-    new_item = {"id": item_id, "name": item.name}
-    _DB["items"].append(new_item)
-
 
 @app.get("/items/{item_id}")
 def get_item(item_id: int, request: Request):
@@ -158,7 +232,8 @@ def get_item(item_id: int, request: Request):
         logger.warning(f"Invalid item ID attempted: {item_id}")
         raise ApiError(
             code="validation_error",
-            message="Invalid item ID. Must be a positive integer.",
+            title="Invalid item identifier",
+            detail="Invalid item ID. Must be a positive integer.",
             status=422,
         )
 
@@ -178,7 +253,12 @@ def get_item(item_id: int, request: Request):
             return it
 
     logger.warning(f"Item not found: {item_id}")
-    raise ApiError(code="not_found", message="item not found", status=404)
+    raise ApiError(
+        code="not_found",
+        title="Item not found",
+        detail="item not found",
+        status=404,
+    )
 
 
 @app.get("/items")
@@ -193,3 +273,43 @@ def list_items(request: Request):
 
     logger.info(f"Items list accessed, count: {len(_DB['items'])}")
     return {"items": _DB["items"], "count": len(_DB["items"])}
+
+
+UPLOAD_STORAGE_PATH = os.getenv("UPLOAD_STORAGE_PATH", "./var/uploads")
+
+
+def _upload_storage_root() -> Path:
+    return Path(UPLOAD_STORAGE_PATH)
+
+
+@app.post("/uploads")
+async def upload_file(request: Request, file: UploadFile = File(...)):
+    """Upload endpoint protected by secure storage controls."""
+    raw = await file.read(MAX_BYTES + 1)
+    await file.close()
+    try:
+        stored = secure_store(_upload_storage_root(), raw)
+    except UploadError as exc:
+        logger.warning("Upload rejected: %s (%s)", exc.code, request.url)
+        raise ApiError(
+            code=exc.code,
+            title="Invalid upload",
+            detail=exc.message,
+            status=exc.status,
+            extras={"media_type": file.content_type},
+        ) from exc
+
+    AuditLogger.log_security_event(
+        "FILE_UPLOAD",
+        {
+            "resource_id": stored.resource_id,
+            "media_type": stored.media_type,
+            "client_ip": request.client.host if request.client else "unknown",
+        },
+        request,
+    )
+
+    return {
+        "resource_id": stored.resource_id,
+        "media_type": stored.media_type,
+    }
