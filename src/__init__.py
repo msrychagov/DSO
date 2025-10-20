@@ -1,1 +1,1 @@
-"""Top-level package for shared project modules."""
+"""MVP application package with shared security modules."""
