@@ -5,9 +5,11 @@ Implements controls for identified risks R1-R12.
 
 import hashlib
 import logging
+import math
 import os
 import time
 from collections import defaultdict, deque
+from dataclasses import dataclass
 from typing import Dict, Optional
 
 from fastapi import HTTPException, Request
@@ -15,37 +17,60 @@ from fastapi import HTTPException, Request
 logger = logging.getLogger(__name__)
 
 
+@dataclass(slots=True)
+class RateLimitDecision:
+    """Outcome of rate limit evaluation."""
+
+    allowed: bool
+    retry_after: Optional[float] = None
+
+
 class RateLimiter:
     """Rate limiting control for R1 (Brute force attacks) and R4 (DDoS)"""
 
     def __init__(
-        self, max_requests: int = 5, time_window: int = 60, enabled: bool = True
+        self,
+        max_requests: int = 5,
+        time_window: int = 60,
+        enabled: bool = True,
     ):
         self.max_requests = max_requests
         self.time_window = time_window
         self.enabled = enabled
-        self.requests = defaultdict(deque)
+        self.requests: Dict[str, deque[float]] = defaultdict(deque)
 
-    def is_allowed(self, client_ip: str) -> bool:
-        """Check if request is allowed based on rate limiting"""
+    def check(self, client_ip: str) -> RateLimitDecision:
+        """Check if request is allowed based on rate limiting."""
         if not self.enabled:
-            return True
+            return RateLimitDecision(True, None)
 
         now = time.time()
         client_requests = self.requests[client_ip]
 
         # Remove old requests outside time window
-        while client_requests and client_requests[0] <= now - self.time_window:
+        threshold = now - self.time_window
+        while client_requests and client_requests[0] <= threshold:
             client_requests.popleft()
 
         # Check if limit exceeded
         if len(client_requests) >= self.max_requests:
-            logger.warning(f"Rate limit exceeded for IP: {client_ip}")
-            return False
+            earliest = client_requests[0]
+            retry_after = max(0.0, self.time_window - (now - earliest))
+            logger.warning(
+                "Rate limit exceeded for IP %s (max=%s/window=%ss)",
+                client_ip,
+                self.max_requests,
+                self.time_window,
+            )
+            return RateLimitDecision(False, retry_after)
 
         # Add current request
         client_requests.append(now)
-        return True
+        return RateLimitDecision(True, None)
+
+    def is_allowed(self, client_ip: str) -> bool:
+        """Backward-compatible helper used in legacy tests."""
+        return self.check(client_ip).allowed
 
 
 class SecurityHeaders:
@@ -175,8 +200,17 @@ class SessionManager:
 class SecurityMiddleware:
     """Security middleware implementing multiple controls"""
 
-    def __init__(self, rate_limiting_enabled: bool = True):
-        self.rate_limiter = RateLimiter(enabled=rate_limiting_enabled)
+    def __init__(
+        self,
+        rate_limiting_enabled: bool = True,
+        max_requests: int = 5,
+        time_window: int = 60,
+    ):
+        self.rate_limiter = RateLimiter(
+            max_requests=max_requests,
+            time_window=time_window,
+            enabled=rate_limiting_enabled,
+        )
         self.session_manager = SessionManager()
         self.audit_logger = AuditLogger()
 
@@ -185,14 +219,19 @@ class SecurityMiddleware:
         client_ip = request.client.host if request.client else "unknown"
 
         # R1, R4: Rate limiting
-        if not self.rate_limiter.is_allowed(client_ip):
+        decision = self.rate_limiter.check(client_ip)
+        if not decision.allowed:
+            retry_after = decision.retry_after or self.rate_limiter.time_window
+            retry_after_header = str(max(1, math.ceil(retry_after)))
             self.audit_logger.log_security_event(
                 "RATE_LIMIT_EXCEEDED",
                 {"client_ip": client_ip, "path": str(request.url.path)},
                 request,
             )
             raise HTTPException(
-                status_code=429, detail="Rate limit exceeded. Please try again later."
+                status_code=429,
+                detail="Too many requests. Please retry later.",
+                headers={"Retry-After": retry_after_header},
             )
 
         # R6, R10: Audit logging for sensitive endpoints
@@ -211,4 +250,26 @@ class SecurityMiddleware:
 # Global security middleware instance
 # Disable rate limiting in test environment
 rate_limiting_enabled = os.getenv("RATE_LIMITING_ENABLED", "true").lower() == "true"
-security_middleware = SecurityMiddleware(rate_limiting_enabled=rate_limiting_enabled)
+
+
+def _load_int_env(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(raw)
+        if value <= 0:
+            raise ValueError
+        return value
+    except ValueError:
+        logger.warning("Invalid value '%s' for %s. Falling back to %s.", raw, name, default)
+        return default
+
+
+max_requests_env = _load_int_env("RATE_LIMIT_MAX_REQUESTS", 5)
+window_seconds_env = _load_int_env("RATE_LIMIT_WINDOW_SECONDS", 60)
+security_middleware = SecurityMiddleware(
+    rate_limiting_enabled=rate_limiting_enabled,
+    max_requests=max_requests_env,
+    time_window=window_seconds_env,
+)

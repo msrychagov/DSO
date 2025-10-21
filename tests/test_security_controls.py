@@ -25,8 +25,10 @@ class TestRateLimiting:
         rate_limiter = RateLimiter(max_requests=5, time_window=60, enabled=True)
 
         # Test that normal requests are allowed
-        for i in range(3):
-            assert rate_limiter.is_allowed("127.0.0.1")
+        for _ in range(3):
+            decision = rate_limiter.check("127.0.0.1")
+            assert decision.allowed is True
+            assert decision.retry_after is None
 
     def test_rate_limiting_blocks_excessive_requests(self):
         """Test that excessive requests are blocked"""
@@ -34,22 +36,24 @@ class TestRateLimiting:
         rate_limiter = RateLimiter(max_requests=2, time_window=60, enabled=True)
 
         # Make requests to fill the limit
-        assert rate_limiter.is_allowed("127.0.0.1")
-        assert rate_limiter.is_allowed("127.0.0.1")
-        assert not rate_limiter.is_allowed("127.0.0.1")  # Should be blocked
+        assert rate_limiter.check("127.0.0.1").allowed is True
+        assert rate_limiter.check("127.0.0.1").allowed is True
+        decision = rate_limiter.check("127.0.0.1")
+        assert decision.allowed is False  # Should be blocked
+        assert decision.retry_after is not None
 
     def test_rate_limiter_reset_after_time_window(self):
         """Test that rate limiter resets after time window"""
         rate_limiter = RateLimiter(max_requests=2, time_window=1)
 
         # Make requests to fill the limit
-        assert rate_limiter.is_allowed("127.0.0.1")
-        assert rate_limiter.is_allowed("127.0.0.1")
-        assert not rate_limiter.is_allowed("127.0.0.1")  # Should be blocked
+        assert rate_limiter.check("127.0.0.1").allowed is True
+        assert rate_limiter.check("127.0.0.1").allowed is True
+        assert rate_limiter.check("127.0.0.1").allowed is False  # Should be blocked
 
         # Wait for time window to reset
         time.sleep(1.1)
-        assert rate_limiter.is_allowed("127.0.0.1")  # Should be allowed again
+        assert rate_limiter.check("127.0.0.1").allowed is True  # Should be allowed again
 
 
 class TestInputValidation:
@@ -74,20 +78,22 @@ class TestInputValidation:
         for malicious_name in malicious_names:
             response = client.post("/items", params={"name": malicious_name})
             assert response.status_code == 422
-            assert "Invalid item name" in response.json()["error"]["message"]
+            body = response.json()
+            assert body["code"] == "validation_error"
+            assert "Invalid item name" in body["detail"]
 
     def test_invalid_item_name_length(self):
         """Test that overly long names are blocked"""
         long_name = "x" * 101  # Exceeds 100 character limit
         response = client.post("/items", params={"name": long_name})
         assert response.status_code == 422
-        assert "Invalid item name" in response.json()["error"]["message"]
+        assert response.json()["code"] == "validation_error"
 
     def test_empty_item_name(self):
         """Test that empty names are blocked"""
         response = client.post("/items", params={"name": ""})
         assert response.status_code == 422
-        assert "Invalid item name" in response.json()["error"]["message"]
+        assert response.json()["code"] == "validation_error"
 
     def test_valid_item_id(self):
         """Test that valid item IDs are accepted"""
@@ -105,13 +111,13 @@ class TestInputValidation:
         """Test that negative item IDs are blocked"""
         response = client.get("/items/-1")
         assert response.status_code == 422
-        assert "Invalid item ID" in response.json()["error"]["message"]
+        assert response.json()["code"] == "validation_error"
 
     def test_invalid_item_id_zero(self):
         """Test that zero item ID is blocked"""
         response = client.get("/items/0")
         assert response.status_code == 422
-        assert "Invalid item ID" in response.json()["error"]["message"]
+        assert response.json()["code"] == "validation_error"
 
 
 class TestSecurityHeaders:
@@ -244,9 +250,7 @@ class TestCORSConfiguration:
         assert response.status_code == 200
 
         # Test with disallowed origin (should still work but CORS headers should be restrictive)
-        response = client.get(
-            "/items", headers={"Origin": "https://malicious-site.com"}
-        )
+        response = client.get("/items", headers={"Origin": "https://malicious-site.com"})
         # The request itself should work, but CORS headers should prevent cross-origin access
         assert response.status_code == 200
 
@@ -276,7 +280,9 @@ class TestErrorHandling:
         # Test with invalid item ID
         response = client.get("/items/999999")
         assert response.status_code == 404
-        error_message = response.json()["error"]["message"]
+        payload = response.json()
+        error_message = payload["detail"]
+        assert payload["code"] == "not_found"
 
         # Error message should be generic, not revealing internal details
         assert "item not found" in error_message.lower()
@@ -287,7 +293,9 @@ class TestErrorHandling:
         """Test that validation errors are generic"""
         response = client.post("/items", params={"name": "'; DROP TABLE items; --"})
         assert response.status_code == 422
-        error_message = response.json()["error"]["message"]
+        payload = response.json()
+        error_message = payload["detail"]
+        assert payload["code"] == "validation_error"
 
         # Error message should be generic, not revealing the specific attack pattern
         assert "Invalid item name" in error_message

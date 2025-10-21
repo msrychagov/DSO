@@ -22,17 +22,23 @@ class TestItemCreation:
         """Test item creation with empty name."""
         response = client.post("/items", params={"name": ""})
         assert response.status_code == 422
+        data = response.json()
+        assert data["code"] == "validation_error"
+        assert data["title"] == "Invalid item name"
 
     def test_create_item_whitespace_only(self):
         """Test item creation with whitespace-only name."""
         response = client.post("/items", params={"name": "   "})
         assert response.status_code == 422
+        data = response.json()
+        assert data["code"] == "validation_error"
 
     def test_create_item_too_long(self):
         """Test item creation with too long name."""
         long_name = "a" * 101
         response = client.post("/items", params={"name": long_name})
         assert response.status_code == 422
+        assert response.json()["code"] == "validation_error"
 
     def test_create_item_forbidden_name(self):
         """Test item creation with forbidden names."""
@@ -63,17 +69,19 @@ class TestItemRetrieval:
         """Test item retrieval with non-existent ID."""
         response = client.get("/items/999")
         assert response.status_code == 404
-        assert "not_found" in response.json()["error"]["code"]
+        data = response.json()
+        assert data["code"] == "not_found"
+        assert data["title"] == "Item not found"
 
     def test_get_item_invalid_id(self):
         """Test item retrieval with invalid ID."""
         response = client.get("/items/0")
         assert response.status_code == 422
-        assert "validation_error" in response.json()["error"]["code"]
+        assert response.json()["code"] == "validation_error"
 
         response = client.get("/items/-1")
         assert response.status_code == 422
-        assert "validation_error" in response.json()["error"]["code"]
+        assert response.json()["code"] == "validation_error"
 
 
 class TestItemListing:
@@ -112,13 +120,16 @@ class TestErrorHandling:
         response = client.get("/items/999")
         assert response.status_code == 404
         data = response.json()
-        assert "error" in data
-        assert "code" in data["error"]
-        assert "message" in data["error"]
+        assert data["code"] == "not_found"
+        assert data["status"] == 404
+        assert "correlation_id" in data
+        assert data["title"] == "Item not found"
 
     def test_validation_error_format(self):
         """Test validation error format."""
         response = client.post("/items", params={"name": ""})
         assert response.status_code == 422
-        # FastAPI validation errors have different format
-        # but should still be handled by our error handler
+        data = response.json()
+        assert data["code"] == "validation_error"
+        assert data["status"] == 422
+        assert "correlation_id" in data

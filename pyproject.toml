@@ -9,3 +9,7 @@ select = ["E","F","W","I"]
 [tool.isort]
 profile = "black"
 line_length = 100
+known_first_party = ["app", "src"]
+
+[tool.black]
+line-length = 100

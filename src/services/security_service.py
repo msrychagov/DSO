@@ -18,9 +18,7 @@ logger = logging.getLogger(__name__)
 class RateLimiter:
     """Rate limiting control for R1 (Brute force attacks) and R4 (DDoS)"""
 
-    def __init__(
-        self, max_requests: int = 5, time_window: int = 60, enabled: bool = True
-    ):
+    def __init__(self, max_requests: int = 5, time_window: int = 60, enabled: bool = True):
         self.max_requests = max_requests
         self.time_window = time_window
         self.enabled = enabled
@@ -33,10 +31,7 @@ class RateLimiter:
 
         now = time.time()
         # Remove timestamps older than the window
-        while (
-            self.requests[client_id]
-            and self.requests[client_id][0] < now - self.time_window
-        ):
+        while self.requests[client_id] and self.requests[client_id][0] < now - self.time_window:
             self.requests[client_id].popleft()
 
         if len(self.requests[client_id]) >= self.max_requests:
@@ -70,9 +65,7 @@ class AuditLogger:
     def __init__(self):
         self.logs = []
 
-    def log_event(
-        self, event_type: str, user_id: int, item_id: Optional[int] = None, **kwargs
-    ):
+    def log_event(self, event_type: str, user_id: int, item_id: Optional[int] = None, **kwargs):
         """Log a security-relevant event."""
         log_entry = {
             "timestamp": datetime.utcnow().isoformat(),

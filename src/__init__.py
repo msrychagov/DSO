@@ -1,3 +1,1 @@
-"""
-MVP Application Package
-"""
+"""MVP application package with shared security modules."""
