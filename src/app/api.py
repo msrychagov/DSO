@@ -1,17 +1,17 @@
-"""
-FastAPI application for the MVP.
-"""
+"""FastAPI application for the MVP."""
 
 import logging
-from datetime import datetime
+import os
+import re
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
 
-from fastapi import Depends, FastAPI, HTTPException, Query, status
+from fastapi import Depends, FastAPI, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from src.domain.models import (
-    ErrorResponse,
     Item,
     ItemCreate,
     ItemsResponse,
@@ -22,9 +22,12 @@ from src.domain.models import (
     UserCreate,
     UserLogin,
 )
+from src.security.problem_details import problem_response
+from src.security.uploads import MAX_BYTES, UploadError, secure_store
 from src.services.auth_service import auth_service
 from src.services.item_service import item_service
 from src.services.nfr_service import nfr_service
+from src.services.payment_service import PaymentValidationError, payment_service
 from src.services.security_service import security_service
 
 # Configure logging
@@ -43,42 +46,92 @@ app.add_middleware(
 )
 
 
-# Add security middleware for threat model controls
-@app.middleware("http")
-async def security_middleware(request, call_next):
-    """Security middleware implementing threat model controls."""
-    try:
-        # Process request through security controls
-        security_service.process_request(request)
-    except HTTPException as e:
-        return JSONResponse(
-            status_code=e.status_code,
-            content={"error": {"code": "SECURITY_ERROR", "message": e.detail}},
-            headers=security_service.get_security_headers(),
-        )
+# Security
+security = HTTPBearer()
 
-    # Process request
-    response = await call_next(request)
+UPLOAD_STORAGE_PATH = os.getenv("UPLOAD_STORAGE_PATH", "./var/uploads")
 
-    # Add security headers to response
-    security_headers = security_service.get_security_headers()
-    for header, value in security_headers.items():
-        response.headers[header] = value
+EMAIL_RE = re.compile(r"(?P<local>[A-Za-z0-9._%+-]{1,64})@(?P<domain>[A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+PLAIN_DIGITS_RE = re.compile(r"\b\d{6,}\b")
 
-    return response
+
+def _ensure_correlation_id(request: Request) -> str:
+    """Return existing correlation id or generate a new one."""
+    correlation_id = getattr(request.state, "correlation_id", None)
+    if not correlation_id:
+        correlation_id = nfr_service.generate_correlation_id()
+        request.state.correlation_id = correlation_id
+    return correlation_id
+
+
+def _problem_response(
+    request: Request,
+    *,
+    status_code: int,
+    title: str,
+    detail: str,
+    code: str,
+    type_: str = "about:blank",
+    headers: dict[str, str] | None = None,
+    extras: dict[str, Any] | None = None,
+):
+    """Produce a RFC 7807 response with a stable correlation id."""
+    payload = {"code": code}
+    if extras:
+        payload.update(_sanitize_extras(extras))
+    sanitized_detail = _mask_pii(detail)
+    return problem_response(
+        status=status_code,
+        title=title,
+        detail=sanitized_detail,
+        type_=type_,
+        headers=headers,
+        extras=payload,
+        correlation_id=_ensure_correlation_id(request),
+        instance=str(request.url.path),
+    )
+
+
+def _upload_storage_root() -> Path:
+    return Path(UPLOAD_STORAGE_PATH)
+
+
+def _format_utc_iso(value: datetime) -> str:
+    return value.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _mask_pii(value: str | None) -> str:
+    if not value:
+        return value or ""
+
+    def _mask_email(match: re.Match[str]) -> str:
+        local = match.group("local")
+        domain = match.group("domain")
+        masked_local = local[0] + "***" if len(local) > 1 else "***"
+        return f"{masked_local}@{domain}"
+
+    masked = EMAIL_RE.sub(_mask_email, value)
+    masked = PLAIN_DIGITS_RE.sub("***", masked)
+    return masked
+
+
+def _sanitize_extras(data: Any) -> Any:
+    if isinstance(data, dict):
+        return {key: _sanitize_extras(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_sanitize_extras(item) for item in data]
+    if isinstance(data, str):
+        return _mask_pii(data)
+    return data
 
 
 # Add NFR middleware for request tracking
 @app.middleware("http")
-async def nfr_middleware(request, call_next):
+async def nfr_middleware(request: Request, call_next):
     """NFR middleware for request tracking and security."""
-    correlation_id = nfr_service.generate_correlation_id()
-    request.state.correlation_id = correlation_id
-
-    # Log request
+    correlation_id = _ensure_correlation_id(request)
     nfr_service.log_request(correlation_id, str(request.url))
 
-    # Add security headers
     response = await call_next(request)
     security_headers = nfr_service.get_security_headers()
     for header, value in security_headers.items():
@@ -87,8 +140,38 @@ async def nfr_middleware(request, call_next):
     return response
 
 
-# Security
-security = HTTPBearer()
+# Add security middleware for threat model controls
+@app.middleware("http")
+async def security_middleware(request: Request, call_next):
+    """Security middleware implementing threat model controls."""
+    try:
+        security_service.process_request(request)
+    except HTTPException as exc:
+        headers = security_service.get_security_headers().copy()
+        if exc.headers:
+            headers.update(exc.headers)
+        code = (
+            "rate_limit_exceeded"
+            if exc.status_code == status.HTTP_429_TOO_MANY_REQUESTS
+            else "security_error"
+        )
+        detail = exc.detail if isinstance(exc.detail, str) else "Security policy violation"
+        return _problem_response(
+            request,
+            status_code=exc.status_code,
+            title="Security policy violation",
+            detail=detail,
+            code=code,
+            headers=headers,
+        )
+
+    response = await call_next(request)
+
+    security_headers = security_service.get_security_headers()
+    for header, value in security_headers.items():
+        response.headers[header] = value
+
+    return response
 
 
 def get_current_user(
@@ -113,32 +196,60 @@ def get_admin_user(user: User = Depends(get_current_user)) -> User:
 
 # Exception handlers
 @app.exception_handler(ValueError)
-async def value_error_exception_handler(request, exc: ValueError):
+async def value_error_exception_handler(request: Request, exc: ValueError):
     """Handle ValueError exceptions."""
-    logger.warning(f"ValueError: {exc}")
-    return JSONResponse(
+    logger.warning("ValueError: %s", exc)
+    return _problem_response(
+        request,
         status_code=status.HTTP_400_BAD_REQUEST,
-        content=ErrorResponse(code="VALIDATION_ERROR", message=str(exc)).model_dump(),
+        title="Invalid input",
+        detail=str(exc),
+        code="validation_error",
     )
 
 
 @app.exception_handler(HTTPException)
-async def http_exception_handler(request, exc: HTTPException):
+async def http_exception_handler(request: Request, exc: HTTPException):
     """Handle HTTPException exceptions."""
-    logger.warning(f"HTTPException: {exc.detail}")
-    return JSONResponse(
-        status_code=exc.status_code,
-        content=ErrorResponse(code="HTTP_ERROR", message=exc.detail).model_dump(),
+    detail = exc.detail if isinstance(exc.detail, str) else "HTTP error"
+    status_code = exc.status_code
+    title = "HTTP error"
+    code = "http_error"
+
+    if status_code == status.HTTP_401_UNAUTHORIZED:
+        title = "Authentication required"
+        code = "not_authenticated"
+    elif status_code == status.HTTP_403_FORBIDDEN:
+        title = "Access denied"
+        code = "access_denied"
+    elif status_code == status.HTTP_404_NOT_FOUND:
+        title = "Resource not found"
+        code = "not_found"
+    elif status_code == status.HTTP_429_TOO_MANY_REQUESTS:
+        title = "Too many requests"
+        code = "rate_limit_exceeded"
+
+    logger.warning("HTTPException (%s): %s", status_code, detail)
+    return _problem_response(
+        request,
+        status_code=status_code,
+        title=title,
+        detail=detail,
+        code=code,
+        headers=exc.headers,
     )
 
 
 @app.exception_handler(Exception)
-async def general_exception_handler(request, exc: Exception):
+async def general_exception_handler(request: Request, exc: Exception):
     """Handle all other exceptions."""
-    logger.error(f"Unhandled exception: {exc}", exc_info=True)
-    return JSONResponse(
+    logger.error("Unhandled exception: %s", exc, exc_info=True)
+    return _problem_response(
+        request,
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content=ErrorResponse(code="INTERNAL_ERROR", message="Internal server error").model_dump(),
+        title="Internal server error",
+        detail="Internal server error",
+        code="internal_error",
     )
 
 
@@ -247,6 +358,78 @@ async def delete_item(item_id: int, current_user: User = Depends(get_current_use
             detail="Item not found or access denied",
         )
     logger.info(f"Item deleted: {item_id} by user {current_user.username}")
+
+
+# Payments endpoint
+@app.post("/api/v1/payments", status_code=status.HTTP_201_CREATED)
+async def record_payment(request: Request, current_user: User = Depends(get_current_user)):
+    """Validate and store payment events with strict schema enforcement."""
+    raw_body = await request.body()
+    try:
+        payload = payment_service.parse_payload(raw_body)
+    except PaymentValidationError as exc:
+        extras = {"errors": exc.errors} if exc.errors else None
+        return _problem_response(
+            request,
+            status_code=exc.status,
+            title="Invalid payment payload",
+            detail=exc.detail,
+            code=exc.code,
+            extras=extras,
+        )
+
+    record = payment_service.record_payment(payload)
+    security_service.audit_logger.log_event(
+        "payment_recorded",
+        current_user.id,
+        item_id=None,
+        amount=format(record.amount, ".2f"),
+        currency=record.currency,
+    )
+    logger.info("Payment recorded for user %s", current_user.username)
+    return {
+        "payment_id": record.id,
+        "amount": format(record.amount, ".2f"),
+        "currency": record.currency,
+        "occurred_at": _format_utc_iso(record.occurred_at),
+        "description": record.description,
+    }
+
+
+# Secure file uploads endpoint
+@app.post("/api/v1/uploads", status_code=status.HTTP_201_CREATED)
+async def upload_secure_file(
+    request: Request,
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+):
+    """Persist user uploads using strict file validation."""
+    raw = await file.read(MAX_BYTES + 1)
+    await file.close()
+    try:
+        stored = secure_store(_upload_storage_root(), raw)
+    except UploadError as exc:
+        return _problem_response(
+            request,
+            status_code=exc.status,
+            title="Invalid upload",
+            detail=exc.message,
+            code=exc.code,
+            extras={"media_type": file.content_type},
+        )
+
+    security_service.audit_logger.log_event(
+        "file_uploaded",
+        current_user.id,
+        item_id=None,
+        media_type=stored.media_type,
+        resource_id=stored.resource_id,
+    )
+    logger.info("File uploaded by %s as %s", current_user.username, stored.media_type)
+    return {
+        "resource_id": stored.resource_id,
+        "media_type": stored.media_type,
+    }
 
 
 # Health check

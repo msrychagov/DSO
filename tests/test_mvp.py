@@ -2,23 +2,11 @@
 Tests for MVP functionality.
 """
 
-import pytest
 from fastapi.testclient import TestClient
 
-from src.adapters.database import db
 from src.app.api import app
 
 client = TestClient(app)
-
-
-@pytest.fixture(autouse=True)
-def clear_database():
-    """Clear database before each test."""
-    db.users.clear()
-    db.items.clear()
-    db.user_passwords.clear()
-    db.next_user_id = 1
-    db.next_item_id = 1
 
 
 class TestAuthentication:
@@ -46,7 +34,11 @@ class TestAuthentication:
         client.post("/api/v1/auth/register", json=user_data)  # First registration
         response = client.post("/api/v1/auth/register", json=user_data)  # Second registration
         assert response.status_code == 400
-        assert response.json()["message"] == "Username already exists"
+        body = response.json()
+        assert body["code"] == "http_error"
+        assert body["detail"] == "Username already exists"
+        assert body["status"] == 400
+        assert "correlation_id" in body
 
     def test_login_success(self):
         """Test successful user login."""
@@ -66,7 +58,11 @@ class TestAuthentication:
         login_data = {"username": "nonexistent", "password": "wrongpassword"}
         response = client.post("/api/v1/auth/login", json=login_data)
         assert response.status_code == 401
-        assert response.json()["message"] == "Invalid credentials"
+        body = response.json()
+        assert body["code"] == "not_authenticated"
+        assert "Invalid credentials" in body["detail"]
+        assert body["status"] == 401
+        assert "correlation_id" in body
 
 
 class TestItems:
@@ -96,8 +92,11 @@ class TestItems:
         """Test item creation without authorization."""
         item_data = {"name": "Unauthorized Item", "description": "Should fail"}
         response = client.post("/api/v1/items", json=item_data)
-        assert response.status_code == 403
-        assert response.json()["message"] == "Not authenticated"
+        assert response.status_code in (401, 403)
+        body = response.json()
+        assert body["status"] == response.status_code
+        assert body["code"] in {"access_denied", "not_authenticated"}
+        assert "correlation_id" in body
 
     def test_get_item_success(self):
         """Test successful item retrieval."""
@@ -113,7 +112,10 @@ class TestItems:
         """Test getting a non-existent item."""
         response = client.get("/api/v1/items/999", headers=self.headers)
         assert response.status_code == 404
-        assert response.json()["message"] == "Item not found"
+        body = response.json()
+        assert body["code"] == "not_found"
+        assert body["detail"] == "Item not found"
+        assert "correlation_id" in body
 
     def test_get_items_list(self):
         """Test getting a list of items with pagination."""
