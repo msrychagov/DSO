@@ -51,6 +51,7 @@ def test_payment_rejects_invalid_currency(auth_headers):
     assert body["code"] == "invalid_payment_payload"
     assert body["status"] == 422
     assert response.headers["X-Correlation-ID"] == body["correlation_id"]
+    assert all("input" not in err for err in body["errors"])
 
 
 def test_payment_rejects_invalid_json(auth_headers):

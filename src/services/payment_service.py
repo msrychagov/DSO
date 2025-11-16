@@ -22,7 +22,7 @@ def _normalize_to_utc(dt: datetime) -> datetime:
 
 
 def _serialize_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Convert validation errors into JSON serializable payloads."""
+    """Convert validation errors into JSON serializable payloads without PII."""
 
     def convert(value: Any) -> Any:
         if isinstance(value, Decimal):
@@ -33,7 +33,11 @@ def _serialize_errors(errors: list[dict[str, Any]]) -> list[dict[str, Any]]:
             return {key: convert(val) for key, val in value.items()}
         return value
 
-    return [convert(error) for error in errors]
+    sanitized_errors: list[dict[str, Any]] = []
+    for error in errors:
+        filtered = {key: convert(val) for key, val in error.items() if key != "input"}
+        sanitized_errors.append(filtered)
+    return sanitized_errors
 
 
 class PaymentPayload(BaseModel):

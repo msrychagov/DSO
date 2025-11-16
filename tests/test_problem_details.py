@@ -1,5 +1,6 @@
 from fastapi.testclient import TestClient
 
+import src.app.api as src_api
 from app.main import app
 
 
@@ -30,3 +31,10 @@ def test_http_exception_is_normalized_to_problem_details():
     assert payload["type"] == "about:blank"
     assert payload["detail"] == "Requested resource was not found"
     assert response.headers["X-Correlation-ID"] == payload["correlation_id"]
+
+
+def test_mask_pii_sanitizes_email_value():
+    masked = src_api._mask_pii("contact user@example.com or 1234567890")
+    assert "user@example.com" not in masked
+    assert "***@example.com" in masked
+    assert "1234567890" not in masked

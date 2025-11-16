@@ -2,6 +2,7 @@
 
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,9 @@ security = HTTPBearer()
 
 UPLOAD_STORAGE_PATH = os.getenv("UPLOAD_STORAGE_PATH", "./var/uploads")
 
+EMAIL_RE = re.compile(r"(?P<local>[A-Za-z0-9._%+-]{1,64})@(?P<domain>[A-Za-z0-9.-]+\.[A-Za-z]{2,})")
+PLAIN_DIGITS_RE = re.compile(r"\b\d{6,}\b")
+
 
 def _ensure_correlation_id(request: Request) -> str:
     """Return existing correlation id or generate a new one."""
@@ -74,11 +78,12 @@ def _problem_response(
     """Produce a RFC 7807 response with a stable correlation id."""
     payload = {"code": code}
     if extras:
-        payload.update(extras)
+        payload.update(_sanitize_extras(extras))
+    sanitized_detail = _mask_pii(detail)
     return problem_response(
         status=status_code,
         title=title,
-        detail=detail,
+        detail=sanitized_detail,
         type_=type_,
         headers=headers,
         extras=payload,
@@ -93,6 +98,31 @@ def _upload_storage_root() -> Path:
 
 def _format_utc_iso(value: datetime) -> str:
     return value.replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _mask_pii(value: str | None) -> str:
+    if not value:
+        return value or ""
+
+    def _mask_email(match: re.Match[str]) -> str:
+        local = match.group("local")
+        domain = match.group("domain")
+        masked_local = local[0] + "***" if len(local) > 1 else "***"
+        return f"{masked_local}@{domain}"
+
+    masked = EMAIL_RE.sub(_mask_email, value)
+    masked = PLAIN_DIGITS_RE.sub("***", masked)
+    return masked
+
+
+def _sanitize_extras(data: Any) -> Any:
+    if isinstance(data, dict):
+        return {key: _sanitize_extras(value) for key, value in data.items()}
+    if isinstance(data, list):
+        return [_sanitize_extras(item) for item in data]
+    if isinstance(data, str):
+        return _mask_pii(data)
+    return data
 
 
 # Add NFR middleware for request tracking

@@ -29,8 +29,8 @@
   Результат: `69 passed`.
 
 ### C3. Валидация / ошибки / логирование
-- ✅ `_problem_response` добавляет `code`, `correlation_id` и одинаковые статусы (см. `src/app/api.py`).
-- ✅ Платёжный сервис сериализует ошибки без утечки Decimal (`src/services/payment_service.py`).
+- ✅ `_problem_response` добавляет `code`, `correlation_id`, маскирует PII в `detail/extras` (`_mask_pii` в `src/app/api.py`).
+- ✅ Платёжный сервис сериализует ошибки без поля `input`, чтобы не показывать исходный payload (`src/services/payment_service.py`).
 - ✅ Audit logger (`security_service.audit_logger`) получает события `payment_recorded` и `file_uploaded`.
 
 ### C4. Линт/формат/quality gate
@@ -41,6 +41,7 @@
   - `pytest -q`
   - `pre-commit run --all-files`
   на Python 3.11 и 3.12. CI блокирует merge при ошибке любого шага.
+- ✅ Конфиги лежат в `pyproject.toml`, `.ruff.toml`, `.pre-commit-config.yaml`.
 
 ### C5. Интеграция
 - ✅ Контроли встроены в `src/app/api.py` (боевой сервис), а не в учебные примеры.
