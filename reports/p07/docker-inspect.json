@@ -1,0 +1,313 @@
+[
+    {
+        "Id": "f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a",
+        "Created": "2025-11-16T20:10:27.673345046Z",
+        "Path": "uvicorn",
+        "Args": [
+            "app.main:app",
+            "--host",
+            "0.0.0.0",
+            "--port",
+            "8000"
+        ],
+        "State": {
+            "Status": "running",
+            "Running": true,
+            "Paused": false,
+            "Restarting": false,
+            "OOMKilled": false,
+            "Dead": false,
+            "Pid": 1384,
+            "ExitCode": 0,
+            "Error": "",
+            "StartedAt": "2025-11-16T20:10:27.764271879Z",
+            "FinishedAt": "0001-01-01T00:00:00Z",
+            "Health": {
+                "Status": "healthy",
+                "FailingStreak": 0,
+                "Log": [
+                    {
+                        "Start": "2025-11-16T20:10:32.842353506Z",
+                        "End": "2025-11-16T20:10:32.952232631Z",
+                        "ExitCode": 0,
+                        "Output": ""
+                    }
+                ]
+            }
+        },
+        "Image": "sha256:d651bccaef5ab3dbae23bf26a1c94d3f7647f7b23801aa98b0e7364d501ae9a0",
+        "ResolvConfPath": "/var/lib/docker/containers/f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a/resolv.conf",
+        "HostnamePath": "/var/lib/docker/containers/f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a/hostname",
+        "HostsPath": "/var/lib/docker/containers/f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a/hosts",
+        "LogPath": "/var/lib/docker/containers/f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a/f1becfa1c08723d14ee643afb5a5e65ec72e8abdb36729d9ba1bc7da9e80ac1a-json.log",
+        "Name": "/course-project-msrychagov-app-1",
+        "RestartCount": 0,
+        "Driver": "overlayfs",
+        "Platform": "linux",
+        "MountLabel": "",
+        "ProcessLabel": "",
+        "AppArmorProfile": "",
+        "ExecIDs": null,
+        "HostConfig": {
+            "Binds": [
+                "/Users/mixail.rychagov/учеба/3 курс/РБПО/course-project-msrychagov/var/uploads:/app/var/uploads:rw"
+            ],
+            "ContainerIDFile": "",
+            "LogConfig": {
+                "Type": "json-file",
+                "Config": {}
+            },
+            "NetworkMode": "course-project-msrychagov_default",
+            "PortBindings": {
+                "8000/tcp": [
+                    {
+                        "HostIp": "",
+                        "HostPort": "8000"
+                    }
+                ]
+            },
+            "RestartPolicy": {
+                "Name": "no",
+                "MaximumRetryCount": 0
+            },
+            "AutoRemove": false,
+            "VolumeDriver": "",
+            "VolumesFrom": null,
+            "ConsoleSize": [
+                0,
+                0
+            ],
+            "CapAdd": null,
+            "CapDrop": [
+                "ALL"
+            ],
+            "CgroupnsMode": "private",
+            "Dns": null,
+            "DnsOptions": null,
+            "DnsSearch": null,
+            "ExtraHosts": [],
+            "GroupAdd": null,
+            "IpcMode": "private",
+            "Cgroup": "",
+            "Links": null,
+            "OomScoreAdj": 0,
+            "PidMode": "",
+            "Privileged": false,
+            "PublishAllPorts": false,
+            "ReadonlyRootfs": true,
+            "SecurityOpt": [
+                "no-new-privileges:true"
+            ],
+            "UTSMode": "",
+            "UsernsMode": "",
+            "ShmSize": 67108864,
+            "Runtime": "runc",
+            "Isolation": "",
+            "CpuShares": 0,
+            "Memory": 0,
+            "NanoCpus": 0,
+            "CgroupParent": "",
+            "BlkioWeight": 0,
+            "BlkioWeightDevice": null,
+            "BlkioDeviceReadBps": null,
+            "BlkioDeviceWriteBps": null,
+            "BlkioDeviceReadIOps": null,
+            "BlkioDeviceWriteIOps": null,
+            "CpuPeriod": 0,
+            "CpuQuota": 0,
+            "CpuRealtimePeriod": 0,
+            "CpuRealtimeRuntime": 0,
+            "CpusetCpus": "",
+            "CpusetMems": "",
+            "Devices": null,
+            "DeviceCgroupRules": null,
+            "DeviceRequests": null,
+            "MemoryReservation": 0,
+            "MemorySwap": 0,
+            "MemorySwappiness": null,
+            "OomKillDisable": null,
+            "PidsLimit": null,
+            "Ulimits": null,
+            "CpuCount": 0,
+            "CpuPercent": 0,
+            "IOMaximumIOps": 0,
+            "IOMaximumBandwidth": 0,
+            "Mounts": [
+                {
+                    "Type": "tmpfs",
+                    "Target": "/tmp",
+                    "TmpfsOptions": {
+                        "SizeBytes": 65536000,
+                        "Mode": 1777
+                    }
+                }
+            ],
+            "MaskedPaths": [
+                "/proc/asound",
+                "/proc/acpi",
+                "/proc/interrupts",
+                "/proc/kcore",
+                "/proc/keys",
+                "/proc/latency_stats",
+                "/proc/timer_list",
+                "/proc/timer_stats",
+                "/proc/sched_debug",
+                "/proc/scsi",
+                "/sys/firmware",
+                "/sys/devices/virtual/powercap"
+            ],
+            "ReadonlyPaths": [
+                "/proc/bus",
+                "/proc/fs",
+                "/proc/irq",
+                "/proc/sys",
+                "/proc/sysrq-trigger"
+            ]
+        },
+        "GraphDriver": {
+            "Data": null,
+            "Name": "overlayfs"
+        },
+        "Mounts": [
+            {
+                "Type": "bind",
+                "Source": "/Users/mixail.rychagov/учеба/3 курс/РБПО/course-project-msrychagov/var/uploads",
+                "Destination": "/app/var/uploads",
+                "Mode": "rw",
+                "RW": true,
+                "Propagation": "rprivate"
+            },
+            {
+                "Type": "tmpfs",
+                "Source": "",
+                "Destination": "/tmp",
+                "Mode": "",
+                "RW": true,
+                "Propagation": ""
+            }
+        ],
+        "Config": {
+            "Hostname": "f1becfa1c087",
+            "Domainname": "",
+            "User": "app",
+            "AttachStdin": false,
+            "AttachStdout": true,
+            "AttachStderr": true,
+            "ExposedPorts": {
+                "8000/tcp": {}
+            },
+            "Tty": false,
+            "OpenStdin": false,
+            "StdinOnce": false,
+            "Env": [
+                "PYTHONUNBUFFERED=1",
+                "PATH=/usr/local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                "LANG=C.UTF-8",
+                "GPG_KEY=7169605F62C751356D054A26A821E680E5FA6305",
+                "PYTHON_VERSION=3.12.8",
+                "PYTHON_SHA256=c909157bb25ec114e5869124cc2a9c4a4d4c1e957ca4ff553f1edc692101154e",
+                "PYTHONDONTWRITEBYTECODE=1",
+                "PIP_NO_CACHE_DIR=1"
+            ],
+            "Cmd": [
+                "--host",
+                "0.0.0.0",
+                "--port",
+                "8000"
+            ],
+            "Healthcheck": {
+                "Test": [
+                    "CMD",
+                    "python",
+                    "-c",
+                    "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health')"
+                ],
+                "Interval": 30000000000,
+                "Timeout": 5000000000,
+                "StartPeriod": 15000000000,
+                "Retries": 3
+            },
+            "Image": "secdev-app:local",
+            "Volumes": null,
+            "WorkingDir": "/app",
+            "Entrypoint": [
+                "uvicorn",
+                "app.main:app"
+            ],
+            "OnBuild": null,
+            "Labels": {
+                "com.docker.compose.config-hash": "ca1f26b16c593e36cdbf08946972a2d9db3bb9c25aa2db4f5d435dbd8deb87fe",
+                "com.docker.compose.container-number": "1",
+                "com.docker.compose.depends_on": "",
+                "com.docker.compose.image": "sha256:d651bccaef5ab3dbae23bf26a1c94d3f7647f7b23801aa98b0e7364d501ae9a0",
+                "com.docker.compose.oneoff": "False",
+                "com.docker.compose.project": "course-project-msrychagov",
+                "com.docker.compose.project.config_files": "/Users/mixail.rychagov/учеба/3 курс/РБПО/course-project-msrychagov/docker-compose.yml",
+                "com.docker.compose.project.working_dir": "/Users/mixail.rychagov/учеба/3 курс/РБПО/course-project-msrychagov",
+                "com.docker.compose.service": "app",
+                "com.docker.compose.version": "2.34.0"
+            }
+        },
+        "NetworkSettings": {
+            "Bridge": "",
+            "SandboxID": "7f91c7db38117b772fe081013bb46ef025ee8112f3c569c5c5f815f68adab76d",
+            "SandboxKey": "/var/run/docker/netns/7f91c7db3811",
+            "Ports": {
+                "8000/tcp": [
+                    {
+                        "HostIp": "0.0.0.0",
+                        "HostPort": "8000"
+                    }
+                ]
+            },
+            "HairpinMode": false,
+            "LinkLocalIPv6Address": "",
+            "LinkLocalIPv6PrefixLen": 0,
+            "SecondaryIPAddresses": null,
+            "SecondaryIPv6Addresses": null,
+            "EndpointID": "",
+            "Gateway": "",
+            "GlobalIPv6Address": "",
+            "GlobalIPv6PrefixLen": 0,
+            "IPAddress": "",
+            "IPPrefixLen": 0,
+            "IPv6Gateway": "",
+            "MacAddress": "",
+            "Networks": {
+                "course-project-msrychagov_default": {
+                    "IPAMConfig": null,
+                    "Links": null,
+                    "Aliases": [
+                        "course-project-msrychagov-app-1",
+                        "app"
+                    ],
+                    "MacAddress": "3a:db:e5:e1:37:7f",
+                    "DriverOpts": null,
+                    "GwPriority": 0,
+                    "NetworkID": "9bc91c64bfec9abcb2bded9b6bb9d28d7e7ad83f4cf9fa0592b98d677ccd4af8",
+                    "EndpointID": "c9604241ebb0d0eaf85abfdc8b1ae183a052493d32aece4f7f957abdcea237a8",
+                    "Gateway": "172.24.0.1",
+                    "IPAddress": "172.24.0.2",
+                    "IPPrefixLen": 16,
+                    "IPv6Gateway": "",
+                    "GlobalIPv6Address": "",
+                    "GlobalIPv6PrefixLen": 0,
+                    "DNSNames": [
+                        "course-project-msrychagov-app-1",
+                        "app",
+                        "f1becfa1c087"
+                    ]
+                }
+            }
+        },
+        "ImageManifestDescriptor": {
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "digest": "sha256:e275ea3e75b75f5f7f7ff2850dc34a6105c480409949526a4e94b350ece85834",
+            "size": 2955,
+            "platform": {
+                "architecture": "arm64",
+                "os": "linux"
+            }
+        }
+    }
+]
