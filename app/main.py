@@ -31,6 +31,17 @@ app.add_middleware(
 @app.middleware("http")
 async def security_middleware_handler(request: Request, call_next):
     """Security middleware implementing threat model controls"""
+    if request.headers.get("range"):
+        logger.warning("Blocked Range header from %s", request.client)
+        security_headers = security_middleware.get_security_headers()
+        return problem_response(
+            status=416,
+            title="Range requests disabled",
+            detail="Range header is not supported",
+            extras={"code": "range_header_blocked"},
+            headers=security_headers,
+            instance=str(request.url.path),
+        )
     try:
         # Process request through security controls
         await security_middleware.process_request(request)

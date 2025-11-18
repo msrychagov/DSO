@@ -1,0 +1,2 @@
+# Starlette Range header DoS (CVE-2025-62727) mitigated by rejecting Range headers at app level
+CVE-2025-62727
