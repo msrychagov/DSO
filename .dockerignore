@@ -15,3 +15,10 @@ build/
 htmlcov/
 node_modules/
 .env
+reports/
+tmp/
+compose.yaml
+docker-compose.yml
+scripts/
+security_audit.log
+*.log

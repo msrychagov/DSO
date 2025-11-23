@@ -42,10 +42,15 @@ Badge добавится автоматически после загрузки 
 
 ## Контейнеры
 ```bash
-docker build -t secdev-app .
-docker run --rm -p 8000:8000 secdev-app
-# или
-docker compose up --build
+# Хардненый образ с многостадийной сборкой
+docker build --target runtime -t secdev-app:local .
+docker run --rm -p 8000:8000 secdev-app:local
+
+# Локальный стек с Docker Compose (healthcheck + read-only FS)
+IMAGE_NAME=secdev-app APP_PORT=8000 docker compose up --build
+
+# Быстрая проверка хардненга/healthcheckов
+scripts/test_container.sh
 ```
 
 ## Эндпойнты

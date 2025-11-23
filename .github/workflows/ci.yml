@@ -12,6 +12,9 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    env:
+      IMAGE_NAME: secdev-app
+      DOCKER_BUILDKIT: "1"
     strategy:
       matrix:
         python-version: ["3.11", "3.12"]
@@ -45,3 +48,56 @@ jobs:
 
       - name: Pre-commit (all files)
         run: pre-commit run --all-files
+
+      - name: Dockerfile lint (Hadolint)
+        if: matrix.python-version == '3.12'
+        id: hadolint
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          docker run --rm -i \
+            -v "${PWD}/hadolint.yml:/root/.config/hadolint.yaml:ro" \
+            ghcr.io/hadolint/hadolint:v2.12.0 < Dockerfile | tee hadolint-report.txt
+
+      - name: Build container image (runtime)
+        if: matrix.python-version == '3.12'
+        run: |
+          docker build \
+            --target runtime \
+            --build-arg SKIP_TESTS=true \
+            -t "$IMAGE_NAME:${{ github.sha }}" .
+
+      - name: Scan image with Trivy
+        if: matrix.python-version == '3.12'
+        id: trivy
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: ${{ env.IMAGE_NAME }}:${{ github.sha }}
+          format: 'json'
+          output: trivy-report.json
+          severity: 'CRITICAL,HIGH'
+          ignore-unfixed: true
+          vuln-type: 'os,library'
+          exit-code: '1'
+
+      - name: Upload container security reports
+        if: matrix.python-version == '3.12' && always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: container-security
+          path: |
+            hadolint-report.txt
+            trivy-report.json
+
+      - name: Enforce Hadolint result
+        if: matrix.python-version == '3.12' && steps.hadolint.outcome != 'success'
+        run: |
+          echo "Hadolint detected issues" >&2
+          exit 1
+
+      - name: Enforce Trivy result
+        if: matrix.python-version == '3.12' && steps.trivy.outcome != 'success'
+        run: |
+          echo "Trivy detected vulnerabilities" >&2
+          exit 1
